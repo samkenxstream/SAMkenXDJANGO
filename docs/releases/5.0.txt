@@ -37,6 +37,77 @@ compatible with Django 5.0.
 What's new in Django 5.0
 ========================
 
+Facet filters in the admin
+--------------------------
+
+Facet counts are now shown for applied filters in the admin changelist when
+toggled on via the UI. This behavior can be changed via the new
+:attr:`.ModelAdmin.show_facets` attribute. For more information see
+:ref:`facet-filters`.
+
+Simplified templates for form field rendering
+---------------------------------------------
+
+Django 5.0 introduces the concept of a field group, and field group templates.
+This simplifies rendering of the related elements of a Django form field such
+as its label, widget, help text, and errors.
+
+For example, the template below:
+
+.. code-block:: html+django
+
+    <form>
+    ...
+    <div>
+      {{ form.name.label }}
+      {% if form.name.help_text %}
+        <div class="helptext">{{ form.name.help_text|safe }}</div>
+      {% endif %}
+      {{ form.name.errors }}
+      {{ form.name }}
+      <div class="row">
+        <div class="col">
+          {{ form.email.label }}
+          {% if form.email.help_text %}
+            <div class="helptext">{{ form.email.help_text|safe }}</div>
+          {% endif %}
+          {{ form.email.errors }}
+          {{ form.email }}
+        </div>
+        <div class="col">
+          {{ form.password.label }}
+          {% if form.password.help_text %}
+            <div class="helptext">{{ form.password.help_text|safe }}</div>
+          {% endif %}
+          {{ form.password.errors }}
+          {{ form.password }}
+        </div>
+      </div>
+    </div>
+    ...
+    </form>
+
+Can now be simplified to:
+
+.. code-block:: html+django
+
+    <form>
+    ...
+    <div>
+      {{ form.name.as_field_group }}
+      <div class="row">
+        <div class="col">{{ form.email.as_field_group }}</div>
+        <div class="col">{{ form.password.as_field_group }}</div>
+      </div>
+    </div>
+    ...
+    </form>
+
+:meth:`~django.forms.BoundField.as_field_group` renders fields with the
+``"django/forms/field.html"`` template by default and can be customized on a
+per-project, per-field, or per-request basis. See
+:ref:`reusable-field-group-templates`.
+
 Minor features
 --------------
 
@@ -45,6 +116,11 @@ Minor features
 
 * The new :meth:`.AdminSite.get_log_entries` method allows customizing the
   queryset for the site's listed log entries.
+
+* The ``django.contrib.admin.AllValuesFieldListFilter``,
+  ``ChoicesFieldListFilter``, ``RelatedFieldListFilter``, and
+  ``RelatedOnlyFieldListFilter`` admin filters now handle multi-valued query
+  parameters.
 
 :mod:`django.contrib.admindocs`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -56,6 +132,9 @@ Minor features
 
 * The default iteration count for the PBKDF2 password hasher is increased from
   600,000 to 720,000.
+
+* ``AuthenticationMiddleware`` now adds an :meth:`.HttpRequest.auser`
+  asynchronous method that returns the currently logged-in user.
 
 :mod:`django.contrib.contenttypes`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -151,7 +230,9 @@ File Uploads
 Forms
 ~~~~~
 
-* ...
+* :attr:`.ChoiceField.choices` now accepts
+  :ref:`Choices classes <field-choices-enum-types>` directly instead of
+  requiring expansion with the ``choices`` attribute.
 
 Generic Views
 ~~~~~~~~~~~~~
@@ -192,6 +273,10 @@ Models
   of ``ValidationError`` raised during
   :ref:`model validation <validating-objects>`.
 
+* :attr:`.Field.choices` now accepts
+  :ref:`Choices classes <field-choices-enum-types>` directly instead of
+  requiring expansion with the ``choices`` attribute.
+
 Requests and Responses
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -210,7 +295,9 @@ Serialization
 Signals
 ~~~~~~~
 
-* ...
+* The new :meth:`.Signal.asend` and :meth:`.Signal.asend_robust` methods allow
+  asynchronous signal dispatch. Signal receivers may be synchronous or
+  asynchronous, and will be automatically adapted to the correct calling style.
 
 Templates
 ~~~~~~~~~
@@ -265,6 +352,12 @@ Miscellaneous
   ``BaseModelFormSet.save_existing()`` method is renamed to ``obj``.
 
 * The undocumented ``django.contrib.admin.helpers.checkbox`` is removed.
+
+* Integer fields are now validated as 64-bit integers on SQLite to match the
+  behavior of ``sqlite3``.
+
+* The undocumented ``Query.annotation_select_mask`` attribute is changed from a
+  set of strings to an ordered list of strings.
 
 .. _deprecated-features-5.0:
 

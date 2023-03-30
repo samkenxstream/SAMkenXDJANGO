@@ -281,8 +281,22 @@ middleware class is listed in :setting:`MIDDLEWARE`.
         else:
             ...  # Do something for anonymous users.
 
+    The :meth:`auser` method does the same thing but can be used from async
+    contexts.
+
 Methods
 -------
+
+.. method:: HttpRequest.auser()
+
+    .. versionadded:: 5.0
+
+    From the :class:`~django.contrib.auth.middleware.AuthenticationMiddleware`:
+    Coroutine. Returns an instance of :setting:`AUTH_USER_MODEL` representing
+    the currently logged-in user. If the user isn't currently logged in,
+    ``auser`` will return an instance of
+    :class:`~django.contrib.auth.models.AnonymousUser`. This is similar to the
+    :attr:`user` attribute but it works in async contexts.
 
 .. method:: HttpRequest.get_host()
 
@@ -1289,8 +1303,11 @@ Attributes
     Note that if you pass a file-like object like ``io.BytesIO``, it's your
     task to ``seek()`` it before passing it to ``FileResponse``.
 
-    The ``Content-Length`` and ``Content-Type`` headers are automatically set
-    when they can be guessed from contents of ``open_file``.
+    The ``Content-Length`` header is automatically set when it can be guessed
+    from the content of ``open_file``.
+
+    The ``Content-Type`` header is automatically set when it can be guessed
+    from the ``filename``, or the name of ``open_file``.
 
 ``FileResponse`` accepts any file-like object with binary content, for example
 a file open in binary mode like so:

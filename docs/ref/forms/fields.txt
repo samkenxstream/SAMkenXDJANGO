@@ -337,6 +337,19 @@ using the ``disabled`` HTML attribute so that it won't be editable by users.
 Even if a user tampers with the field's value submitted to the server, it will
 be ignored in favor of the value from the form's initial data.
 
+``template_name``
+-----------------
+
+.. attribute:: Field.template_name
+
+.. versionadded:: 5.0
+
+The ``template_name`` argument allows a custom template to be used when the
+field is rendered with :meth:`~django.forms.BoundField.as_field_group`. By 
+default this value is set to ``"django/forms/field.html"``. Can be changed per
+field by overriding this attribute or more generally by overriding the default
+template, see also :ref:`overriding-built-in-field-templates`.
+
 Checking if the field data has changed
 ======================================
 
@@ -431,13 +444,18 @@ For each field, we describe the default widget used if you don't specify
     .. attribute:: choices
 
         Either an :term:`iterable` of 2-tuples to use as choices for this
-        field, :ref:`enumeration <field-choices-enum-types>` choices, or a
+        field, :ref:`enumeration type <field-choices-enum-types>`, or a
         callable that returns such an iterable. This argument accepts the same
         formats as the ``choices`` argument to a model field. See the
         :ref:`model field reference documentation on choices <field-choices>`
         for more details. If the argument is a callable, it is evaluated each
         time the field's form is initialized, in addition to during rendering.
         Defaults to an empty list.
+
+    .. versionchanged:: 5.0
+
+        Support for using :ref:`enumeration types <field-choices-enum-types>`
+        directly in the ``choices`` was added.
 
 ``DateField``
 -------------

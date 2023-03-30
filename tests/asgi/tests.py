@@ -61,7 +61,7 @@ class ASGITest(SimpleTestCase):
 
     # Python's file API is not async compatible. A third-party library such
     # as https://github.com/Tinche/aiofiles allows passing the file to
-    # FileResponse as an async interator. With a sync iterator
+    # FileResponse as an async iterator. With a sync iterator
     # StreamingHTTPResponse triggers a warning when iterating the file.
     # assertWarnsMessage is not async compatible, so ignore_warnings for the
     # test.
@@ -116,7 +116,6 @@ class ASGITest(SimpleTestCase):
             "django.contrib.staticfiles.finders.FileSystemFinder",
         ],
     )
-    @ignore_warnings(module="django.http.response")
     async def test_static_file_response(self):
         application = ASGIStaticFilesHandler(get_asgi_application())
         # Construct HTTP request.

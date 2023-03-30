@@ -177,52 +177,6 @@ class TestHashedFiles:
             self.assertIn(b"https://", relfile.read())
         self.assertPostCondition()
 
-    def test_module_import(self):
-        relpath = self.hashed_file_path("cached/module.js")
-        self.assertEqual(relpath, "cached/module.55fd6938fbc5.js")
-        tests = [
-            # Relative imports.
-            b'import testConst from "./module_test.477bbebe77f0.js";',
-            b'import relativeModule from "../nested/js/nested.866475c46bb4.js";',
-            b'import { firstConst, secondConst } from "./module_test.477bbebe77f0.js";',
-            # Absolute import.
-            b'import rootConst from "/static/absolute_root.5586327fe78c.js";',
-            # Dynamic import.
-            b'const dynamicModule = import("./module_test.477bbebe77f0.js");',
-            # Creating a module object.
-            b'import * as NewModule from "./module_test.477bbebe77f0.js";',
-            # Aliases.
-            b'import { testConst as alias } from "./module_test.477bbebe77f0.js";',
-            b"import {\n"
-            b"    firstVar1 as firstVarAlias,\n"
-            b"    $second_var_2 as secondVarAlias\n"
-            b'} from "./module_test.477bbebe77f0.js";',
-        ]
-        with storage.staticfiles_storage.open(relpath) as relfile:
-            content = relfile.read()
-            for module_import in tests:
-                with self.subTest(module_import=module_import):
-                    self.assertIn(module_import, content)
-        self.assertPostCondition()
-
-    def test_aggregating_modules(self):
-        relpath = self.hashed_file_path("cached/module.js")
-        self.assertEqual(relpath, "cached/module.55fd6938fbc5.js")
-        tests = [
-            b'export * from "./module_test.477bbebe77f0.js";',
-            b'export { testConst } from "./module_test.477bbebe77f0.js";',
-            b"export {\n"
-            b"    firstVar as firstVarAlias,\n"
-            b"    secondVar as secondVarAlias\n"
-            b'} from "./module_test.477bbebe77f0.js";',
-        ]
-        with storage.staticfiles_storage.open(relpath) as relfile:
-            content = relfile.read()
-            for module_import in tests:
-                with self.subTest(module_import=module_import):
-                    self.assertIn(module_import, content)
-        self.assertPostCondition()
-
     @override_settings(
         STATICFILES_DIRS=[os.path.join(TEST_ROOT, "project", "loop")],
         STATICFILES_FINDERS=["django.contrib.staticfiles.finders.FileSystemFinder"],
@@ -366,6 +320,18 @@ class TestHashedFiles:
         with self.assertRaises(Exception):
             call_command("collectstatic", interactive=False, verbosity=0, stderr=err)
         self.assertEqual("Post-processing 'faulty.css' failed!\n\n", err.getvalue())
+        self.assertPostCondition()
+
+    @override_settings(
+        STATICFILES_DIRS=[os.path.join(TEST_ROOT, "project", "nonutf8")],
+        STATICFILES_FINDERS=["django.contrib.staticfiles.finders.FileSystemFinder"],
+    )
+    def test_post_processing_nonutf8(self):
+        finders.get_finder.cache_clear()
+        err = StringIO()
+        with self.assertRaises(UnicodeDecodeError):
+            call_command("collectstatic", interactive=False, verbosity=0, stderr=err)
+        self.assertEqual("Post-processing 'nonutf8.css' failed!\n\n", err.getvalue())
         self.assertPostCondition()
 
 
@@ -632,6 +598,68 @@ class TestCollectionSimpleStorage(CollectionTestCase):
             content = relfile.read()
             self.assertNotIn(b"cached/other.css", content)
             self.assertIn(b"other.deploy12345.css", content)
+
+
+class JSModuleImportAggregationManifestStorage(storage.ManifestStaticFilesStorage):
+    support_js_module_import_aggregation = True
+
+
+@override_settings(
+    STORAGES={
+        STATICFILES_STORAGE_ALIAS: {
+            "BACKEND": (
+                "staticfiles_tests.test_storage."
+                "JSModuleImportAggregationManifestStorage"
+            ),
+        },
+    }
+)
+class TestCollectionJSModuleImportAggregationManifestStorage(CollectionTestCase):
+    hashed_file_path = hashed_file_path
+
+    def test_module_import(self):
+        relpath = self.hashed_file_path("cached/module.js")
+        self.assertEqual(relpath, "cached/module.55fd6938fbc5.js")
+        tests = [
+            # Relative imports.
+            b'import testConst from "./module_test.477bbebe77f0.js";',
+            b'import relativeModule from "../nested/js/nested.866475c46bb4.js";',
+            b'import { firstConst, secondConst } from "./module_test.477bbebe77f0.js";',
+            # Absolute import.
+            b'import rootConst from "/static/absolute_root.5586327fe78c.js";',
+            # Dynamic import.
+            b'const dynamicModule = import("./module_test.477bbebe77f0.js");',
+            # Creating a module object.
+            b'import * as NewModule from "./module_test.477bbebe77f0.js";',
+            # Aliases.
+            b'import { testConst as alias } from "./module_test.477bbebe77f0.js";',
+            b"import {\n"
+            b"    firstVar1 as firstVarAlias,\n"
+            b"    $second_var_2 as secondVarAlias\n"
+            b'} from "./module_test.477bbebe77f0.js";',
+        ]
+        with storage.staticfiles_storage.open(relpath) as relfile:
+            content = relfile.read()
+            for module_import in tests:
+                with self.subTest(module_import=module_import):
+                    self.assertIn(module_import, content)
+
+    def test_aggregating_modules(self):
+        relpath = self.hashed_file_path("cached/module.js")
+        self.assertEqual(relpath, "cached/module.55fd6938fbc5.js")
+        tests = [
+            b'export * from "./module_test.477bbebe77f0.js";',
+            b'export { testConst } from "./module_test.477bbebe77f0.js";',
+            b"export {\n"
+            b"    firstVar as firstVarAlias,\n"
+            b"    secondVar as secondVarAlias\n"
+            b'} from "./module_test.477bbebe77f0.js";',
+        ]
+        with storage.staticfiles_storage.open(relpath) as relfile:
+            content = relfile.read()
+            for module_import in tests:
+                with self.subTest(module_import=module_import):
+                    self.assertIn(module_import, content)
 
 
 class CustomManifestStorage(storage.ManifestStaticFilesStorage):

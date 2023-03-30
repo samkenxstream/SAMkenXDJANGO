@@ -699,7 +699,7 @@ class Query(BaseExpression):
         # All concrete fields that are not part of the defer mask must be
         # loaded. If a relational field is encountered it gets added to the
         # mask for it be considered if `select_related` and the cycle continues
-        # by recursively caling this function.
+        # by recursively calling this function.
         for field in opts.concrete_fields:
             field_mask = mask.pop(field.name, None)
             if field_mask is None:
@@ -1087,7 +1087,12 @@ class Query(BaseExpression):
         if select:
             self.append_annotation_mask([alias])
         else:
-            self.set_annotation_mask(set(self.annotation_select).difference({alias}))
+            annotation_mask = (
+                value
+                for value in dict.fromkeys(self.annotation_select)
+                if value != alias
+            )
+            self.set_annotation_mask(annotation_mask)
         self.annotations[alias] = annotation
 
     def resolve_expression(self, query, *args, **kwargs):
@@ -1300,7 +1305,7 @@ class Query(BaseExpression):
         else:
             output_field = lhs.output_field.__class__
             suggested_lookups = difflib.get_close_matches(
-                name, output_field.get_lookups()
+                name, lhs.output_field.get_lookups()
             )
             if suggested_lookups:
                 suggestion = ", perhaps you meant %s?" % " or ".join(suggested_lookups)
@@ -2130,11 +2135,6 @@ class Query(BaseExpression):
                 # For lookups spanning over relationships, show the error
                 # from the model on which the lookup failed.
                 raise
-            elif name in self.annotations:
-                raise FieldError(
-                    "Cannot select the '%s' alias. Use annotate() to promote "
-                    "it." % name
-                )
             else:
                 names = sorted(
                     [
@@ -2341,12 +2341,12 @@ class Query(BaseExpression):
         if names is None:
             self.annotation_select_mask = None
         else:
-            self.annotation_select_mask = set(names)
+            self.annotation_select_mask = list(dict.fromkeys(names))
         self._annotation_select_cache = None
 
     def append_annotation_mask(self, names):
         if self.annotation_select_mask is not None:
-            self.set_annotation_mask(self.annotation_select_mask.union(names))
+            self.set_annotation_mask((*self.annotation_select_mask, *names))
 
     def set_extra_mask(self, names):
         """
@@ -2380,7 +2380,17 @@ class Query(BaseExpression):
                         extra_names.append(f)
                     elif f in self.annotation_select:
                         annotation_names.append(f)
+                    elif f in self.annotations:
+                        raise FieldError(
+                            f"Cannot select the '{f}' alias. Use annotate() to "
+                            "promote it."
+                        )
                     else:
+                        # Call `names_to_path` to ensure a FieldError including
+                        # annotations about to be masked as valid choices if
+                        # `f` is not resolvable.
+                        if self.annotation_select:
+                            self.names_to_path(f.split(LOOKUP_SEP), self.model._meta)
                         field_names.append(f)
             self.set_extra_mask(extra_names)
             self.set_annotation_mask(annotation_names)
@@ -2423,9 +2433,9 @@ class Query(BaseExpression):
             return {}
         elif self.annotation_select_mask is not None:
             self._annotation_select_cache = {
-                k: v
-                for k, v in self.annotations.items()
-                if k in self.annotation_select_mask
+                k: self.annotations[k]
+                for k in self.annotation_select_mask
+                if k in self.annotations
             }
             return self._annotation_select_cache
         else:
