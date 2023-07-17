@@ -73,6 +73,47 @@ from an async view, you will trigger Django's
 :ref:`asynchronous safety protection <async-safety>` to protect your data from
 corruption.
 
+Decorators
+----------
+
+.. versionadded:: 5.0
+
+The following decorators can be used with both synchronous and asynchronous
+view functions:
+
+* :func:`~django.views.decorators.cache.cache_control`
+* :func:`~django.views.decorators.cache.never_cache`
+* :func:`~django.views.decorators.common.no_append_slash`
+* :func:`~django.views.decorators.csrf.csrf_exempt`
+* :func:`~django.views.decorators.debug.sensitive_variables`
+* :func:`~django.views.decorators.debug.sensitive_post_parameters`
+* :func:`~django.views.decorators.http.condition`
+* :func:`~django.views.decorators.http.etag`
+* :func:`~django.views.decorators.http.last_modified`
+* :func:`~django.views.decorators.http.require_http_methods`
+* :func:`~django.views.decorators.http.require_GET`
+* :func:`~django.views.decorators.http.require_POST`
+* :func:`~django.views.decorators.http.require_safe`
+* :func:`~django.views.decorators.vary.vary_on_cookie`
+* :func:`~django.views.decorators.vary.vary_on_headers`
+* ``xframe_options_deny()``
+* ``xframe_options_sameorigin()``
+* ``xframe_options_exempt()``
+
+For example::
+
+    from django.views.decorators.cache import never_cache
+
+
+    @never_cache
+    def my_sync_view(request):
+        ...
+
+
+    @never_cache
+    async def my_async_view(request):
+        ...
+
 Queries & the ORM
 -----------------
 
@@ -135,6 +176,26 @@ has on your code. In some cases, there may be a performance increase even for
 a purely synchronous codebase under ASGI because the request-handling code is
 still all running asynchronously. In general you will only want to enable ASGI
 mode if you have asynchronous code in your project.
+
+.. _async-handling-disconnect:
+
+Handling disconnects
+--------------------
+
+.. versionadded:: 5.0
+
+For long-lived requests, a client may disconnect before the view returns a
+response. In this case, an ``asyncio.CancelledError`` will be raised in the
+view. You can catch this error and handle it if you need to perform any
+cleanup::
+
+    async def my_view(request):
+        try:
+            # Do some work
+            ...
+        except asyncio.CancelledError:
+            # Handle disconnect
+            raise
 
 .. _async-safety:
 
@@ -214,11 +275,9 @@ context, or vice-versa. For this there are two adapter functions, from the
 are used to transition between the calling styles while preserving
 compatibility.
 
-These adapter functions are widely used in Django. The `asgiref`_ package
+These adapter functions are widely used in Django. The :pypi:`asgiref` package
 itself is part of the Django project, and it is automatically installed as a
 dependency when you install Django with ``pip``.
-
-.. _asgiref: https://pypi.org/project/asgiref/
 
 ``async_to_sync()``
 -------------------

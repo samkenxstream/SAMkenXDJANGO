@@ -10,6 +10,7 @@ import operator
 import os
 import re
 import uuid
+import warnings
 from decimal import Decimal, DecimalException
 from io import BytesIO
 from urllib.parse import urlsplit, urlunsplit
@@ -42,6 +43,7 @@ from django.forms.widgets import (
 )
 from django.utils import formats
 from django.utils.dateparse import parse_datetime, parse_duration
+from django.utils.deprecation import RemovedInDjango60Warning
 from django.utils.duration import duration_string
 from django.utils.ipv6 import clean_ipv6_address
 from django.utils.regex_helper import _lazy_re_compile
@@ -314,7 +316,9 @@ class IntegerField(Field):
         if min_value is not None:
             self.validators.append(validators.MinValueValidator(min_value))
         if step_size is not None:
-            self.validators.append(validators.StepValueValidator(step_size))
+            self.validators.append(
+                validators.StepValueValidator(step_size, offset=min_value)
+            )
 
     def to_python(self, value):
         """
@@ -612,6 +616,9 @@ class EmailField(CharField):
     default_validators = [validators.validate_email]
 
     def __init__(self, **kwargs):
+        # The default maximum length of an email is 320 characters per RFC 3696
+        # section 3.
+        kwargs.setdefault("max_length", 320)
         super().__init__(strip=True, **kwargs)
 
 
@@ -753,7 +760,19 @@ class URLField(CharField):
     }
     default_validators = [validators.URLValidator()]
 
-    def __init__(self, **kwargs):
+    def __init__(self, *, assume_scheme=None, **kwargs):
+        if assume_scheme is None:
+            warnings.warn(
+                "The default scheme will be changed from 'http' to 'https' in Django "
+                "6.0. Pass the forms.URLField.assume_scheme argument to silence this "
+                "warning.",
+                RemovedInDjango60Warning,
+                stacklevel=2,
+            )
+            assume_scheme = "http"
+        # RemovedInDjango60Warning: When the deprecation ends, replace with:
+        # self.assume_scheme = assume_scheme or "https"
+        self.assume_scheme = assume_scheme
         super().__init__(strip=True, **kwargs)
 
     def to_python(self, value):
@@ -773,8 +792,8 @@ class URLField(CharField):
         if value:
             url_fields = split_url(value)
             if not url_fields[0]:
-                # If no URL scheme given, assume http://
-                url_fields[0] = "http"
+                # If no URL scheme given, add a scheme.
+                url_fields[0] = self.assume_scheme
             if not url_fields[1]:
                 # Assume that if no domain is provided, that the path segment
                 # contains the domain.

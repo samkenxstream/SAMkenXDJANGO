@@ -275,6 +275,48 @@ fields. We've specified ``auto_id=False`` to simplify the output:
     <div>Sender:<div class="helptext">A valid email address, please.</div><input type="email" name="sender" required></div>
     <div>Cc myself:<input type="checkbox" name="cc_myself"></div>
 
+When a field has help text and :attr:`~django.forms.BoundField.id_for_label`
+returns a value, we associate ``help_text`` with the input using the
+``aria-describedby`` HTML attribute:
+
+.. code-block:: pycon
+
+    >>> from django import forms
+    >>> class UserForm(forms.Form):
+    ...     username = forms.CharField(max_length=255, help_text="e.g., user@example.com")
+    ...
+    >>> f = UserForm()
+    >>> print(f)
+    <div>
+    <label for="id_username">Username:</label>
+    <div class="helptext" id="id_username_helptext">e.g., user@example.com</div>
+    <input type="text" name="username" maxlength="255" required aria-describedby="id_username_helptext" id="id_username">
+    </div>
+
+When adding a custom ``aria-describedby`` attribute, make sure to also include
+the ``id`` of the ``help_text`` element (if used) in the desired order. For
+screen reader users, descriptions will be read in their order of appearance
+inside ``aria-describedby``:
+
+.. code-block:: pycon
+
+    >>> class UserForm(forms.Form):
+    ...     username = forms.CharField(
+    ...         max_length=255,
+    ...         help_text="e.g., user@example.com",
+    ...         widget=forms.TextInput(
+    ...             attrs={"aria-describedby": "custom-description id_username_helptext"},
+    ...         ),
+    ...     )
+    ...
+    >>> f = UserForm()
+    >>> print(f["username"])
+    <input type="text" name="username" aria-describedby="custom-description id_username_helptext" maxlength="255" id="id_username" required>
+
+.. versionchanged:: 5.0
+
+    ``aria-describedby`` was added to associate ``help_text`` with its input.
+
 ``error_messages``
 ------------------
 
@@ -473,7 +515,7 @@ For each field, we describe the default widget used if you don't specify
 
     .. attribute:: input_formats
 
-        A list of formats used to attempt to convert a string to a valid
+        An iterable of formats used to attempt to convert a string to a valid
         ``datetime.date`` object.
 
     If no ``input_formats`` argument is provided, the default input formats are
@@ -497,7 +539,7 @@ For each field, we describe the default widget used if you don't specify
 
     .. attribute:: input_formats
 
-        A list of formats used to attempt to convert a string to a valid
+        An iterable of formats used to attempt to convert a string to a valid
         ``datetime.datetime`` object, in addition to ISO 8601 formats.
 
     The field always accepts strings in ISO 8601 formatted dates or similar
@@ -562,7 +604,9 @@ For each field, we describe the default widget used if you don't specify
 
     .. attribute:: step_size
 
-        Limit valid inputs to an integral multiple of ``step_size``.
+        Limit valid inputs to an integral multiple of ``step_size``. If
+        ``min_value`` is also provided, it's added as an offset to determine if
+        the step size matches.
 
 ``DurationField``
 -----------------
@@ -594,7 +638,12 @@ For each field, we describe the default widget used if you don't specify
     * Error message keys: ``required``, ``invalid``
 
     Has the optional arguments ``max_length``, ``min_length``, and
-    ``empty_value`` which work just as they do for :class:`CharField`.
+    ``empty_value`` which work just as they do for :class:`CharField`. The
+    ``max_length`` argument defaults to 320 (see :rfc:`3696#section-3`).
+
+    .. versionchanged:: 3.2.20
+
+        The default value for ``max_length`` was changed to 320 characters.
 
 ``FileField``
 -------------
@@ -695,7 +744,9 @@ For each field, we describe the default widget used if you don't specify
 
     .. attribute:: step_size
 
-        Limit valid inputs to an integral multiple of ``step_size``.
+        Limit valid inputs to an integral multiple of ``step_size``. If
+        ``min_value`` is also provided, it's added as an offset to determine if
+        the step size matches.
 
 ``GenericIPAddressField``
 -------------------------
@@ -831,7 +882,9 @@ For each field, we describe the default widget used if you don't specify
 
     .. attribute:: step_size
 
-        Limit valid inputs to an integral multiple of ``step_size``.
+        Limit valid inputs to an integral multiple of ``step_size``. If
+        ``min_value`` is also provided, it's added as an offset to determine if
+        the step size matches.
 
 ``JSONField``
 -------------
@@ -996,7 +1049,7 @@ For each field, we describe the default widget used if you don't specify
 
     .. attribute:: input_formats
 
-        A list of formats used to attempt to convert a string to a valid
+        An iterable of formats used to attempt to convert a string to a valid
         ``datetime.time`` object.
 
     If no ``input_formats`` argument is provided, the default input formats are
@@ -1071,8 +1124,18 @@ For each field, we describe the default widget used if you don't specify
       given value is a valid URL.
     * Error message keys: ``required``, ``invalid``
 
-    Has the optional arguments ``max_length``, ``min_length``, and
-    ``empty_value`` which work just as they do for :class:`CharField`.
+    Has the optional arguments ``max_length``, ``min_length``, ``empty_value``
+    which work just as they do for :class:`CharField`, and ``assume_scheme``
+    that defaults to ``"http"``.
+
+    .. versionchanged:: 5.0
+
+        The ``assume_scheme`` argument was added.
+
+    .. deprecated:: 5.0
+
+        The default value for ``assume_scheme`` will change from ``"http"`` to
+        ``"https"`` in Django 6.0.
 
 ``UUIDField``
 -------------

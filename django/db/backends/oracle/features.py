@@ -32,6 +32,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     atomic_transactions = False
     nulls_order_largest = True
     requires_literal_defaults = True
+    supports_default_keyword_in_bulk_insert = False
     closed_cursor_error_class = InterfaceError
     bare_select_suffix = " FROM DUAL"
     # Select for update with limit can be achieved on Oracle, but not with the
@@ -120,6 +121,9 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             "migrations.test_operations.OperationTests."
             "test_alter_field_pk_fk_db_collation",
         },
+        "Oracle doesn't support comparing NCLOB to NUMBER.": {
+            "generic_relations_regress.tests.GenericRelationTests.test_textlink_filter",
+        },
     }
     django_test_expected_failures = {
         # A bug in Django/cx_Oracle with respect to string handling (#23843).
@@ -127,6 +131,9 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         "annotations.tests.NonAggregateAnnotationTestCase."
         "test_custom_functions_can_ref_other_functions",
     }
+    insert_test_table_with_defaults = (
+        "INSERT INTO {} VALUES (DEFAULT, DEFAULT, DEFAULT)"
+    )
 
     @cached_property
     def introspected_field_types(self):

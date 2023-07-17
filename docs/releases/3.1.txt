@@ -263,7 +263,7 @@ Cache
   field names in the ``no-cache`` directive for the ``Cache-Control`` header,
   according to :rfc:`7234#section-5.2.2.2`.
 
-* :meth:`~django.core.caches.cache.delete` now returns ``True`` if the key was
+* :meth:`~django.core.cache.cache.delete` now returns ``True`` if the key was
   successfully deleted, ``False`` otherwise.
 
 CSRF
@@ -821,7 +821,7 @@ Miscellaneous
   :class:`~django.db.models.expressions.RawSQL` instead beforehand.
 
 * The ``NullBooleanField`` model field is deprecated in favor of
-  ``BooleanField(null=True)``.
+  ``BooleanField(null=True, blank=True)``.
 
 * ``django.conf.urls.url()`` alias of :func:`django.urls.re_path` is
   deprecated.

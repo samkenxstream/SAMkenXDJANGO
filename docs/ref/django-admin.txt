@@ -677,6 +677,10 @@ is:
 
 Requires ``gettext`` 0.19 or newer.
 
+.. django-admin-option:: --no-obsolete
+
+Removes obsolete message strings from the ``.po`` files.
+
 .. django-admin-option:: --keep-pot
 
 Prevents deleting the temporary ``.pot`` files generated before creating the
@@ -756,6 +760,9 @@ generated migration files to ``stdout``.
 
 Merges model changes into the latest migration and optimize the resulting
 operations.
+
+The updated migration will have a generated name. In order to preserve the
+previous name, set it using ``--name``.
 
 ``migrate``
 -----------
@@ -881,7 +888,7 @@ needed. You don't need to restart the server for code changes to take effect.
 However, some actions like adding files don't trigger a restart, so you'll
 have to restart the server in these cases.
 
-If you're using Linux or MacOS and install both `pywatchman`_ and the
+If you're using Linux or MacOS and install both :pypi:`pywatchman` and the
 `Watchman`_ service, kernel signals will be used to autoreload the server
 (rather than polling file modification timestamps each second). This offers
 better performance on large projects, reduced response time after code changes,
@@ -903,7 +910,6 @@ more robust change detection, and a reduction in power usage. Django supports
     by setting the :envvar:`DJANGO_WATCHMAN_TIMEOUT` environment variable.
 
 .. _Watchman: https://facebook.github.io/watchman/
-.. _pywatchman: https://pypi.org/project/pywatchman/
 .. _watchman documentation: https://facebook.github.io/watchman/docs/config#ignore_dirs
 
 When you start the server, and each time you change Python code while the
@@ -1757,18 +1763,6 @@ documentation.
 
 Can be run as a cron job or directly to clean out expired sessions.
 
-``django.contrib.sitemaps``
----------------------------
-
-``ping_google``
-~~~~~~~~~~~~~~~
-
-This command is only available if the :doc:`Sitemaps framework
-</ref/contrib/sitemaps>` (``django.contrib.sitemaps``) is installed.
-
-Please refer to its :djadmin:`description <ping_google>` in the Sitemaps
-documentation.
-
 ``django.contrib.staticfiles``
 ------------------------------
 
@@ -1920,9 +1914,9 @@ Under Windows, the legacy ``cmd.exe`` native console doesn't support ANSI
 escape sequences so by default there is no color output. In this case either of
 two third-party libraries are needed:
 
-* Install colorama_, a Python package that translates ANSI color codes into
-  Windows API calls. Django commands will detect its presence and will make use
-  of its services to color output just like on Unix-based platforms.
+* Install :pypi:`colorama`, a Python package that translates ANSI color codes
+  into Windows API calls. Django commands will detect its presence and will
+  make use of its services to color output just like on Unix-based platforms.
   ``colorama`` can be installed via pip:
 
   .. code-block:: doscon
@@ -1941,7 +1935,6 @@ installation of ``ANSICON`` by setting the appropriate environmental variable,
 .. _`Windows Terminal`: https://www.microsoft.com/en-us/p/windows-terminal-preview/9n0dx20hk701
 .. _`VS Code`: https://code.visualstudio.com
 .. _ANSICON: http://adoxa.altervista.org/ansicon/
-.. _colorama: https://pypi.org/project/colorama/
 
 Custom colors
 ~~~~~~~~~~~~~

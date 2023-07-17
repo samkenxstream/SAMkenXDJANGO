@@ -1368,7 +1368,7 @@ For example, this statement yields a single ``Q`` object that represents the
 
 This is equivalent to the following SQL ``WHERE`` clause:
 
-.. code-block: sql
+.. code-block:: sql
 
     WHERE question LIKE 'Who%' OR question LIKE 'What%'
 
@@ -1789,6 +1789,18 @@ Specifying a custom reverse manager also enables you to call its custom
 methods::
 
     b.entry_set(manager="entries").is_published()
+
+.. admonition:: Interaction with prefetching
+
+    When calling :meth:`~django.db.models.query.QuerySet.prefetch_related` with
+    a reverse relation, the default manager will be used. If you want to
+    prefetch related objects using a custom reverse manager, use
+    :class:`Prefetch() <django.db.models.Prefetch>`. For example::
+
+        from django.db.models import Prefetch
+
+        prefetch_manager = Prefetch("entry_set", queryset=Entry.entries.all())
+        Blog.objects.prefetch_related(prefetch_manager)
 
 Additional methods to handle related objects
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -14,7 +14,7 @@ from django.contrib.admin.checks import (
     InlineModelAdminChecks,
     ModelAdminChecks,
 )
-from django.contrib.admin.exceptions import DisallowedModelAdminToField
+from django.contrib.admin.exceptions import DisallowedModelAdminToField, NotRegistered
 from django.contrib.admin.templatetags.admin_urls import add_preserved_filters
 from django.contrib.admin.utils import (
     NestedObjects,
@@ -185,23 +185,27 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
             # rendered output. formfield can be None if it came from a
             # OneToOneField with parent_link=True or a M2M intermediary.
             if formfield and db_field.name not in self.raw_id_fields:
-                related_modeladmin = self.admin_site._registry.get(
-                    db_field.remote_field.model
-                )
-                wrapper_kwargs = {}
-                if related_modeladmin:
-                    wrapper_kwargs.update(
-                        can_add_related=related_modeladmin.has_add_permission(request),
-                        can_change_related=related_modeladmin.has_change_permission(
-                            request
-                        ),
-                        can_delete_related=related_modeladmin.has_delete_permission(
-                            request
-                        ),
-                        can_view_related=related_modeladmin.has_view_permission(
-                            request
-                        ),
+                try:
+                    related_modeladmin = self.admin_site.get_model_admin(
+                        db_field.remote_field.model
                     )
+                except NotRegistered:
+                    wrapper_kwargs = {}
+                else:
+                    wrapper_kwargs = {
+                        "can_add_related": related_modeladmin.has_add_permission(
+                            request
+                        ),
+                        "can_change_related": related_modeladmin.has_change_permission(
+                            request
+                        ),
+                        "can_delete_related": related_modeladmin.has_delete_permission(
+                            request
+                        ),
+                        "can_view_related": related_modeladmin.has_view_permission(
+                            request
+                        ),
+                    }
                 formfield.widget = widgets.RelatedFieldWidgetWrapper(
                     formfield.widget,
                     db_field.remote_field,
@@ -246,8 +250,11 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
         ordering.  Otherwise don't specify the queryset, let the field decide
         (return None in that case).
         """
-        related_admin = self.admin_site._registry.get(db_field.remote_field.model)
-        if related_admin is not None:
+        try:
+            related_admin = self.admin_site.get_model_admin(db_field.remote_field.model)
+        except NotRegistered:
+            return None
+        else:
             ordering = related_admin.get_ordering(request)
             if ordering is not None and ordering != ():
                 return db_field.remote_field.model._default_manager.using(db).order_by(
@@ -436,7 +443,9 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
             else self.get_list_display(request)
         )
 
-    def lookup_allowed(self, lookup, value):
+    # RemovedInDjango60Warning: when the deprecation ends, replace with:
+    # def lookup_allowed(self, lookup, value, request):
+    def lookup_allowed(self, lookup, value, request=None):
         from django.contrib.admin.filters import SimpleListFilter
 
         model = self.model
@@ -482,7 +491,12 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
             # Either a local field filter, or no fields at all.
             return True
         valid_lookups = {self.date_hierarchy}
-        for filter_item in self.list_filter:
+        # RemovedInDjango60Warning: when the deprecation ends, replace with:
+        # for filter_item in self.get_list_filter(request):
+        list_filter = (
+            self.get_list_filter(request) if request is not None else self.list_filter
+        )
+        for filter_item in list_filter:
             if isinstance(filter_item, type) and issubclass(
                 filter_item, SimpleListFilter
             ):

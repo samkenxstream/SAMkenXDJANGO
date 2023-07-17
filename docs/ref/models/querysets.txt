@@ -34,7 +34,7 @@ You can evaluate a ``QuerySet`` in the following ways:
   Note: Don't use this if all you want to do is determine if at least one
   result exists. It's more efficient to use :meth:`~QuerySet.exists`.
 
-* **Asynchronous iteration.**. A ``QuerySet`` can also be iterated over using
+* **Asynchronous iteration.** A ``QuerySet`` can also be iterated over using
   ``async for``::
 
       async for e in Entry.objects.all():
@@ -765,7 +765,7 @@ first item is the first field, etc. For example:
 
 If you only pass in a single field, you can also pass in the ``flat``
 parameter. If ``True``, this will mean the returned results are single values,
-rather than one-tuples. An example should make the difference clearer:
+rather than 1-tuples. An example should make the difference clearer:
 
 .. code-block:: pycon
 
@@ -1983,15 +1983,13 @@ Combined querysets must use the same model.
 AND (``&``)
 ~~~~~~~~~~~
 
-Combines two ``QuerySet``\s using the SQL ``AND`` operator.
+Combines two ``QuerySet``\s using the SQL ``AND`` operator in a manner similar
+to chaining filters.
 
 The following are equivalent::
 
     Model.objects.filter(x=1) & Model.objects.filter(y=2)
-    Model.objects.filter(x=1, y=2)
-    from django.db.models import Q
-
-    Model.objects.filter(Q(x=1) & Q(y=2))
+    Model.objects.filter(x=1).filter(y=2)
 
 SQL equivalent:
 
@@ -2023,7 +2021,8 @@ may be generated.
 XOR (``^``)
 ~~~~~~~~~~~
 
-Combines two ``QuerySet``\s using the SQL ``XOR`` operator.
+Combines two ``QuerySet``\s using the SQL ``XOR`` operator. A ``XOR``
+expression matches rows that are matched by an odd number of operands.
 
 The following are equivalent::
 
@@ -2046,12 +2045,20 @@ SQL equivalent:
     .. code-block:: sql
 
         (x OR y OR ... OR z) AND
-        1=(
+        1=MOD(
             (CASE WHEN x THEN 1 ELSE 0 END) +
             (CASE WHEN y THEN 1 ELSE 0 END) +
             ...
-            (CASE WHEN z THEN 1 ELSE 0 END) +
+            (CASE WHEN z THEN 1 ELSE 0 END),
+            2
         )
+
+   .. versionchanged:: 5.0
+
+        In older versions, on databases without native support for the SQL
+        ``XOR`` operator, ``XOR`` returned rows that were matched by exactly
+        one operand. The previous behavior was not consistent with MySQL,
+        MariaDB, and Python behavior.
 
 Methods that do not return ``QuerySet``\s
 -----------------------------------------
@@ -2404,9 +2411,13 @@ On databases that support it (all except Oracle and SQLite < 3.24), setting the
 SQLite, in addition to ``update_fields``, a list of ``unique_fields`` that may
 be in conflict must be provided.
 
-Enabling the ``ignore_conflicts`` or ``update_conflicts`` parameter disable
-setting the primary key on each model instance (if the database normally
-support it).
+Enabling the ``ignore_conflicts`` parameter disables setting the primary key on
+each model instance (if the database normally supports it).
+
+.. versionchanged:: 5.0
+
+    In older versions, enabling the ``update_conflicts`` parameter prevented
+    setting the primary key on each model instance.
 
 .. warning::
 
@@ -3822,7 +3833,7 @@ documentation to learn how to create your aggregates.
     currently emulates these features using a text field. Attempts to use
     aggregation on date/time fields in SQLite will raise ``NotSupportedError``.
 
-.. admonition:: Note
+.. admonition:: Empty queryset
 
     Aggregation functions return ``None`` when used with an empty
     ``QuerySet``. For example, the ``Sum`` aggregation function returns ``None``
@@ -3900,6 +3911,7 @@ by the aggregate.
 .. class:: Count(expression, distinct=False, filter=None, **extra)
 
     Returns the number of objects that are related through the provided
+    expression. ``Count('*')`` is equivalent to the SQL ``COUNT(*)``
     expression.
 
     * Default alias: ``<field>__count``

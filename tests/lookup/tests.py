@@ -49,7 +49,7 @@ class LookupTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         # Create a few Authors.
-        cls.au1 = Author.objects.create(name="Author 1", alias="a1")
+        cls.au1 = Author.objects.create(name="Author 1", alias="a1", bio="x" * 4001)
         cls.au2 = Author.objects.create(name="Author 2", alias="a2")
         # Create a few Articles.
         cls.a1 = Article.objects.create(
@@ -691,15 +691,14 @@ class LookupTests(TestCase):
         )
 
     def test_exclude(self):
-        pub_date = datetime(2005, 11, 20)
         a8 = Article.objects.create(
-            headline="Article_ with underscore", pub_date=pub_date
+            headline="Article_ with underscore", pub_date=datetime(2005, 11, 20)
         )
         a9 = Article.objects.create(
-            headline="Article% with percent sign", pub_date=pub_date
+            headline="Article% with percent sign", pub_date=datetime(2005, 11, 21)
         )
         a10 = Article.objects.create(
-            headline="Article with \\ backslash", pub_date=pub_date
+            headline="Article with \\ backslash", pub_date=datetime(2005, 11, 22)
         )
         # exclude() is the opposite of filter() when doing lookups:
         self.assertSequenceEqual(
@@ -1029,6 +1028,13 @@ class LookupTests(TestCase):
         Season.objects.create(year=2012, gt=None)
         self.assertQuerySetEqual(Season.objects.filter(gt__regex=r"^$"), [])
 
+    def test_textfield_exact_null(self):
+        with self.assertNumQueries(1) as ctx:
+            self.assertSequenceEqual(Author.objects.filter(bio=None), [self.au2])
+        # Columns with IS NULL condition are not wrapped (except PostgreSQL).
+        bio_column = connection.ops.quote_name(Author._meta.get_field("bio").column)
+        self.assertIn(f"{bio_column} IS NULL", ctx.captured_queries[0]["sql"])
+
     def test_regex_non_string(self):
         """
         A regex lookup does not fail on non-string fields
@@ -1357,6 +1363,9 @@ class LookupQueryingTests(TestCase):
         cls.s1 = Season.objects.create(year=1942, gt=1942)
         cls.s2 = Season.objects.create(year=1842, gt=1942, nulled_text_field="text")
         cls.s3 = Season.objects.create(year=2042, gt=1942)
+        Game.objects.create(season=cls.s1, home="NY", away="Boston")
+        Game.objects.create(season=cls.s1, home="NY", away="Tampa")
+        Game.objects.create(season=cls.s3, home="Boston", away="Tampa")
 
     def test_annotate(self):
         qs = Season.objects.annotate(equal=Exact(F("year"), 1942))
@@ -1526,4 +1535,20 @@ class LookupQueryingTests(TestCase):
                 {"year": 1842, "century": "other"},
                 {"year": 2042, "century": "other"},
             ],
+        )
+
+    def test_multivalued_join_reuse(self):
+        self.assertEqual(
+            Season.objects.get(Exact(F("games__home"), "NY"), games__away="Boston"),
+            self.s1,
+        )
+        self.assertEqual(
+            Season.objects.get(Exact(F("games__home"), "NY") & Q(games__away="Boston")),
+            self.s1,
+        )
+        self.assertEqual(
+            Season.objects.get(
+                Exact(F("games__home"), "NY") & Exact(F("games__away"), "Boston")
+            ),
+            self.s1,
         )

@@ -24,6 +24,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_slicing_ordering_in_compound = True
     supports_index_on_text_field = False
     supports_update_conflicts = True
+    delete_can_self_reference_subquery = False
     create_test_procedure_without_params_sql = """
         CREATE PROCEDURE test_procedure ()
         BEGIN
@@ -50,6 +51,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     # COLLATE must be wrapped in parentheses because MySQL treats COLLATE as an
     # indexed expression.
     collate_as_index_expression = True
+    insert_test_table_with_defaults = "INSERT INTO {} () VALUES ()"
 
     supports_order_by_nulls_modifier = False
     order_by_nulls_first = True
@@ -296,9 +298,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         """
         return self._mysql_storage_engine != "MyISAM"
 
-    uses_savepoints = property(operator.attrgetter("supports_transactions"))
-    can_release_savepoints = property(operator.attrgetter("supports_transactions"))
-
     @cached_property
     def ignores_table_name_case(self):
         return self.connection.mysql_server_data["lower_case_table_names"]
@@ -344,3 +343,9 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         if self.connection.mysql_is_mariadb:
             return self.connection.mysql_version >= (10, 5, 2)
         return True
+
+    @cached_property
+    def supports_expression_defaults(self):
+        if self.connection.mysql_is_mariadb:
+            return True
+        return self.connection.mysql_version >= (8, 0, 13)

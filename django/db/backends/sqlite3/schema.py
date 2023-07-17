@@ -6,7 +6,7 @@ from django.db import NotSupportedError
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import Statement
 from django.db.backends.utils import strip_quotes
-from django.db.models import UniqueConstraint
+from django.db.models import NOT_PROVIDED, UniqueConstraint
 from django.db.transaction import atomic
 
 
@@ -233,9 +233,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if create_field:
             body[create_field.name] = create_field
             # Choose a default and insert it into the copy map
-            if not create_field.many_to_many and create_field.concrete:
+            if (
+                create_field.db_default is NOT_PROVIDED
+                and not create_field.many_to_many
+                and create_field.concrete
+            ):
                 mapping[create_field.column] = self.prepare_default(
-                    self.effective_default(create_field),
+                    self.effective_default(create_field)
                 )
         # Add in any altered fields
         for alter_field in alter_fields:
@@ -244,9 +248,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             mapping.pop(old_field.column, None)
             body[new_field.name] = new_field
             if old_field.null and not new_field.null:
+                if new_field.db_default is NOT_PROVIDED:
+                    default = self.prepare_default(self.effective_default(new_field))
+                else:
+                    default, _ = self.db_default_sql(new_field)
                 case_sql = "coalesce(%(col)s, %(default)s)" % {
                     "col": self.quote_name(old_field.column),
-                    "default": self.prepare_default(self.effective_default(new_field)),
+                    "default": default,
                 }
                 mapping[new_field.column] = case_sql
             else:
@@ -272,6 +280,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             for unique in model._meta.unique_together
         ]
 
+        # RemovedInDjango51Warning.
         # Work out the new value for index_together, taking renames into
         # account
         index_together = [
@@ -301,7 +310,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             "app_label": model._meta.app_label,
             "db_table": model._meta.db_table,
             "unique_together": unique_together,
-            "index_together": index_together,
+            "index_together": index_together,  # RemovedInDjango51Warning.
             "indexes": indexes,
             "constraints": constraints,
             "apps": apps,
@@ -317,7 +326,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             "app_label": model._meta.app_label,
             "db_table": "new__%s" % strip_quotes(model._meta.db_table),
             "unique_together": unique_together,
-            "index_together": index_together,
+            "index_together": index_together,  # RemovedInDjango51Warning.
             "indexes": indexes,
             "constraints": constraints,
             "apps": apps,
@@ -380,6 +389,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def add_field(self, model, field):
         """Create a field on a model."""
+        from django.db.models.expressions import Value
+
         # Special-case implicit M2M tables.
         if field.many_to_many and field.remote_field.through._meta.auto_created:
             self.create_model(field.remote_field.through)
@@ -388,12 +399,17 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # ADD COLUMN.
             field.primary_key
             or field.unique
-            or
+            or not field.null
             # Fields with default values cannot by handled by ALTER TABLE ADD
             # COLUMN statement because DROP DEFAULT is not supported in
             # ALTER TABLE.
-            not field.null
             or self.effective_default(field) is not None
+            # Fields with non-constant defaults cannot by handled by ALTER
+            # TABLE ADD COLUMN statement.
+            or (
+                field.db_default is not NOT_PROVIDED
+                and not isinstance(field.db_default, Value)
+            )
         ):
             self._remake_table(model, create_field=field)
         else:
