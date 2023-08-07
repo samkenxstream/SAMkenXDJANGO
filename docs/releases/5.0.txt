@@ -190,6 +190,11 @@ Minor features
 
 * Added support for GDAL 3.7.
 
+* Added support for GEOS 3.12.
+
+* The new :meth:`.GEOSGeometry.equals_identical` method allows point-wise
+  equivalence checking of geometries.
+
 :mod:`django.contrib.messages`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -310,6 +315,9 @@ Forms
   fields with their help text, the form field now includes the
   ``aria-describedby`` HTML attribute.
 
+* In order to improve accessibility, the invalid form field now includes the
+  ``aria-invalid="true"`` HTML attribute.
+
 Generic Views
 ~~~~~~~~~~~~~
 
@@ -360,6 +368,23 @@ Models
 * :meth:`.QuerySet.bulk_create` and :meth:`.QuerySet.abulk_create` methods now
   set the primary key on each model instance when the ``update_conflicts``
   parameter is enabled (if the database supports it).
+
+* The new :attr:`.UniqueConstraint.nulls_distinct` attribute allows customizing
+  the treatment of ``NULL`` values on PostgreSQL 15+.
+
+* The new :func:`~django.shortcuts.aget_object_or_404` and
+  :func:`~django.shortcuts.aget_list_or_404` asynchronous shortcuts allow
+  asynchronous getting objects.
+
+* The new :func:`~django.db.models.aprefetch_related_objects` function allows
+  asynchronous prefetching of model instances.
+
+* :meth:`.QuerySet.aiterator` now supports previous calls to
+  ``prefetch_related()``.
+
+* On MariaDB 10.7+, ``UUIDField`` is now created as ``UUID`` column rather than
+  ``CHAR(32)`` column. See the migration guide above for more details on
+  :ref:`migrating-uuidfield`.
 
 Pagination
 ~~~~~~~~~~
@@ -443,6 +468,12 @@ backends.
   ``False`` if the database doesn't support the ``DEFAULT`` keyword in bulk
   ``INSERT`` queries.
 
+Dropped support for MySQL < 8.0.11
+----------------------------------
+
+Support for pre-releases of MySQL 8.0.x series is removed. Django 5.0 supports
+MySQL 8.0.11 and higher.
+
 :mod:`django.contrib.gis`
 -------------------------
 
@@ -466,6 +497,38 @@ Using ``create_defaults__exact`` may now be required with ``QuerySet.update_or_c
 ``create_defaults``. As a consequence, any models that have a field named
 ``create_defaults`` that are used with an ``update_or_create()`` should specify
 the field in the lookup with ``create_defaults__exact``.
+
+.. _migrating-uuidfield:
+
+Migrating existing ``UUIDField`` on MariaDB 10.7+
+-------------------------------------------------
+
+On MariaDB 10.7+, ``UUIDField`` is now created as ``UUID`` column rather than
+``CHAR(32)`` column. As a consequence, any ``UUIDField`` created in
+Django < 5.0 should be replaced with a ``UUIDField`` subclass backed by
+``CHAR(32)``::
+
+    class Char32UUIDField(models.UUIDField):
+        def db_type(self, connection):
+            return "char(32)"
+
+For example::
+
+    class MyModel(models.Model):
+        uuid = models.UUIDField(primary_key=True, default=uuid.uuid4)
+
+Should become::
+
+    class Char32UUIDField(models.UUIDField):
+        def db_type(self, connection):
+            return "char(32)"
+
+
+    class MyModel(models.Model):
+        uuid = Char32UUIDField(primary_key=True, default=uuid.uuid4)
+
+Running the :djadmin:`makemigrations` command will generate a migration
+containing a no-op ``AlterField`` operation.
 
 Miscellaneous
 -------------
@@ -505,6 +568,8 @@ Miscellaneous
 
 * The ``AlreadyRegistered`` and ``NotRegistered`` exceptions are moved from
   ``django.contrib.admin.sites`` to ``django.contrib.admin.exceptions``.
+
+* The minimum supported version of SQLite is increased from 3.21.0 to 3.27.0.
 
 .. _deprecated-features-5.0:
 

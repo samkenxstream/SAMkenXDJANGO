@@ -52,7 +52,7 @@ FORBIDDEN_ALIAS_PATTERN = _lazy_re_compile(r"['`\"\]\[;\s]|--|/\*|\*/")
 
 # Inspired from
 # https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
-EXPLAIN_OPTIONS_PATTERN = _lazy_re_compile(r"[\w\-]+")
+EXPLAIN_OPTIONS_PATTERN = _lazy_re_compile(r"[\w-]+")
 
 
 def get_field_names_from_opts(opts):
@@ -73,14 +73,17 @@ def get_children_from_q(q):
             yield child
 
 
+def get_child_with_renamed_prefix(prefix, replacement, child):
+    if isinstance(child, Node):
+        return rename_prefix_from_q(prefix, replacement, child)
+    lhs, rhs = child
+    lhs = lhs.replace(prefix, replacement, 1)
+    return lhs, rhs
+
+
 def rename_prefix_from_q(prefix, replacement, q):
     return Q.create(
-        [
-            rename_prefix_from_q(prefix, replacement, c)
-            if isinstance(c, Node)
-            else (c[0].replace(prefix, replacement, 1), c[1])
-            for c in q.children
-        ],
+        [get_child_with_renamed_prefix(prefix, replacement, c) for c in q.children],
         q.connector,
         q.negated,
     )
@@ -403,6 +406,7 @@ class Query(BaseExpression):
         # Store annotation mask prior to temporarily adding aggregations for
         # resolving purpose to facilitate their subsequent removal.
         refs_subquery = False
+        refs_window = False
         replacements = {}
         annotation_select_mask = self.annotation_select_mask
         for alias, aggregate_expr in aggregate_exprs.items():
@@ -417,6 +421,10 @@ class Query(BaseExpression):
             self.append_annotation_mask([alias])
             refs_subquery |= any(
                 getattr(self.annotations[ref], "subquery", False)
+                for ref in aggregate.get_refs()
+            )
+            refs_window |= any(
+                getattr(self.annotations[ref], "contains_over_clause", True)
                 for ref in aggregate.get_refs()
             )
             aggregate = aggregate.replace_expressions(replacements)
@@ -451,6 +459,7 @@ class Query(BaseExpression):
             or self.is_sliced
             or has_existing_aggregation
             or refs_subquery
+            or refs_window
             or qualify
             or self.distinct
             or self.combinator
@@ -489,6 +498,11 @@ class Query(BaseExpression):
                             annotation_mask |= expr.get_refs()
                     for aggregate in aggregates.values():
                         annotation_mask |= aggregate.get_refs()
+                    # Avoid eliding expressions that might have an incidence on
+                    # the implicit grouping logic.
+                    for annotation_alias, annotation in self.annotation_select.items():
+                        if annotation.get_group_by_cols():
+                            annotation_mask.add(annotation_alias)
                     inner_query.set_annotation_mask(annotation_mask)
 
             # Add aggregates to the outer AggregateQuery. This requires making
